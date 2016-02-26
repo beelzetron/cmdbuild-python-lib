@@ -17,23 +17,32 @@
 #WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #See the License for the specific language governing permissions and
 #limitations under the License.
-
+#
+_cmdbuild__version="$Id: 65823ba79d5f98cfc7332bad34f34d6c4c76c29e $"
 __author__ = 'Jeroen Baten'
 __copyright__   = "Copyright 2015, Deltares"
 
 import requests
 import json
 from pprint import pprint
-
-# from requests.auth import HTTPDigestAuth
 import logging
+import sys
 
-version = "1.0"
+
+
 #logger = logging.getLogger(__name__)
 
 
 class cmdbuild:
     """CMDBuild interface class. Please see _dir_ for methods"""
+
+    def version(self):
+        """
+        Method to print filename and version string
+        :return:
+        """
+        return __file__ + " version: " + __version
+
 
     def check_valid_json(self,myjson):
         """Function to check is object passed is valid json
@@ -76,12 +85,11 @@ class cmdbuild:
         data = {'username': user, 'password': password}
         headers = {'Content-type': 'application/json', 'Accept': '*/*'}
         r = requests.post(cmdbuild_url, data=json.dumps(data), headers=headers)
-
-        logging.debug(pprint((r.json())))
+        #logging.debug((r.json()))
         r1 = r.json()
         sessionid = r1["data"]["_id"]
-        logging.debug("sessionid=" + str(pprint(sessionid)))
-        logging.info(" Authentication token : " + sessionid)
+        #logging.debug("sessionid=" + str(pprint(sessionid)))
+        #logging.info(" Authentication token : " + sessionid)
 
         if (len(str(sessionid)) > 1):
             self.url = url
@@ -89,8 +97,9 @@ class cmdbuild:
             self.password = password
             self.sessionid = sessionid
             return 0
-        else:
-            return 1
+        #else:
+        #    return 1
+        return 1
 
     def session_info(self):
         """Return information about the current session in json format"""
@@ -175,12 +184,33 @@ class cmdbuild:
             id    id of requested domain
         """
         logging.debug("*** Domain relations of id:'" + id + "'")
-        cmdbuild_url = self.url + "/services/rest/v2/domains/" + id+ "/relations/"
+        cmdbuild_url = self.url + "/services/rest/v2/domains/" + id + "/relations/"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
         r = requests.get(cmdbuild_url,  headers=headers)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
-        logging.debug(pprint(r.json()))
+        logging.debug(r.json())
+        return r.json()
+
+
+    def domain_relations_with_filter(self, id1,field,value):
+        """Return relations of specified domain as json object
+
+        Argument:
+            id    id of requested domain
+            field   field to filter on
+            value   value used in filter
+        """
+        logging.debug("*** Domains of type " + id1 + " where field '" + field + "' has value '" + str(value) + "'")
+        filter="{\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"equal\",\"value\":[\"" + str(value) + "\"]}}}"
+        logging.debug("filter looks like: "+ filter)
+        cmdbuild_url = self.url + "/services/rest/v2/domains/" + id1 + "/relations?filter=" + filter
+        #cmdbuild_url = self.url + "/services/rest/v2/domains/" + id1 + "/relations/"
+        headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
+        r = requests.get(cmdbuild_url,  headers=headers)
+        if not r.status_code // 100 == 2:
+            return "Error: Unexpected response {}".format(r)
+        logging.debug(r.json())
         return r.json()
 
 
@@ -191,13 +221,13 @@ class cmdbuild:
             name    name of domain
             id      id of requested domain relation
         """
-        logging.debug("*** Domain relation details of name "+name+ " and id " + str(id1)  )
-        cmdbuild_url = self.url + "/services/rest/v2/domains/" + name+ "/relations/" +str(id1)
+        logging.debug("*** Domain relation details of name " + name +  " and id " + str(id1)  )
+        cmdbuild_url = self.url + "/services/rest/v2/domains/" + name + "/relations/" + str(id1)
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
         r = requests.get(cmdbuild_url,  headers=headers)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
-        logging.debug(pprint(r.json()))
+        logging.debug(r.json())
         return r.json()
 
 
@@ -213,7 +243,8 @@ class cmdbuild:
         r = requests.get(cmdbuild_url,  headers=headers)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
-        pprint(r.json())
+        logging.debug(r.json())
+        return r.json()
 
 
     def domain_attributes(self, id):
@@ -228,7 +259,112 @@ class cmdbuild:
         r = requests.get(cmdbuild_url,  headers=headers)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
-        pprint(r.json())
+        logging.debug(r.json())
+        return r.json()
+
+
+    def domain_get_all_with_filter(self,field,value):
+        """Return all cards of specified domain and user filter field=value as json object
+
+        Argument:
+            field   field to filter on
+            value   value used in filter
+
+        """
+        logging.debug("*** Domains where field '" + field + "' has value '" + str(value) + "'")
+        filter="{\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"equal\",\"value\":[\"" + str(value) + "\"]}}}"
+        cmdbuild_url = self.url + "/services/rest/v2/domains?filter=" + filter
+        headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
+        r = requests.get(cmdbuild_url,  headers=headers)
+        if not r.status_code // 100 == 2:
+            return "Error: Unexpected response {}".format(r)
+        logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for this domain ")
+        logging.debug(r.json())
+        return r.json()
+
+
+    #def domain_get_all_with_filter_2arg(self, field1, value1, oper, field2, value2):
+        # """Return all cards of specified class and user filter fiel1=value1 'operator' field2=value2 as json object
+        #
+        # Argument:
+        #     field1   field to filter on
+        #     value1   value used in filter
+        #     operator operator to use, Either "and" or "or".
+        #     field2   field to filter on
+        #     value2   value used in filter
+        #
+        # """
+        # example filter code:
+        # {
+        # "attribute": {
+        #     "and": [
+        #         {
+        #             "or": [
+        #                 {
+        #                     "simple": {
+        #                         "value": [
+        #                             146259
+        #                         ],
+        #                         "attribute": "Gruppo",
+        #                         "parameterType": "fixed",
+        #                         "operator": "equal"
+        #                     }
+        #                 },
+        #                 {
+        #                     "simple": {
+        #                         "value": [
+        #                             3941634
+        #                         ],
+        #                         "attribute": "Gruppo",
+        #                         "parameterType": "fixed",
+        #                         "operator": "equal"
+        #                     }
+        #                 }
+        #             ]
+        #         },
+        # TODO: Do we really need this routine?
+        # logging.debug("*** Domains where field1 '" + field1 + "' has value1 '" + str(value1) + "'")
+        # logging.debug("*** and the operator is \'"+str(oper)+"\"")
+        # logging.debug("*** where field2 '" + field2 + "' has value2 '" + str(value2) + "'")
+        # filter="{\"attribute\":{ \"" + oper + "\" : [ "
+        # filter = filter + "{" + "\"simple\":{\"attribute\":\"" + field1 + "\",\"operator\":\"equal\",\"value\":[\"" + str(value1) + "\"]}}"
+        # filter = filter + ","
+        # filter = filter +"{" +"\"simple\":{\"attribute\":\"" + field2 + "\",\"operator\":\"contain\",\"value\":[\"" + str(value2) + "\"]}}"
+        # filter = filter + "] } }"
+        # logging.debug("filter looks like: "+filter)
+        # cmdbuild_url = self.url + "/services/rest/v2/domains?filter="+filter
+        # headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
+        # r = requests.get(cmdbuild_url,  headers=headers)
+        # if not r.status_code // 100 == 2:
+        #     return "Error: Unexpected response {}".format(r)
+        # logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for this domain ")
+        # logging.debug(r.json())
+        # return r.json()
+
+    def domain_relation_get_all_with_filter(self,domain,field,value):
+        """Return all cards of specified class and user filter field=value as json object
+
+        Argument:
+            domain  domain type to apply filter on
+            field   field to filter on
+            value   value used in filter
+        """
+
+        # werkende code in bash:
+        #cmdbuild_url = "http://tl-218.xtr.deltares.nl:8080/cmdbuild/services/rest/v2/domains/" + id + "/relations"
+        #headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': sessionid }
+        # = requests.get(cmdbuild_url, data=json.dumps(data), headers=headers)
+
+        logging.debug("*** Domains '" + domain + "' where relation '" + field + "' has value '" + str(value) + "'")
+        cmdbuild_url = self.url + "/services/rest/v2/domains/" + domain + "/relations?filter={\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"equal\",\"value\":[\"" + str(value) + "\"]}}}"
+        headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
+        r = requests.get(cmdbuild_url,  headers=headers)
+        if not r.status_code // 100 == 2:
+            return "Error: Unexpected response {}".format(r)
+        #logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for this domain ")
+        logging.debug(r.json())
+        return r.json()
+
 
 
     def classes_list(self):
@@ -240,7 +376,7 @@ class cmdbuild:
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug("There are " + str(r.json()["meta"]["total"]) + " results")
-        logging.debug(pprint(r.json()))
+        logging.debug(r.json())
         return r.json()
 
     def classes_total(self):
@@ -252,22 +388,22 @@ class cmdbuild:
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug("There are " + str(r.json()["meta"]["total"]) + " results")
-        logging.debug(pprint(str(r.json()["meta"]["total"])))
+        logging.debug(str(r.json()["meta"]["total"]))
         return (r.json()["meta"]["total"])
 
-    def class_details(self, id):
+    def class_details(self, id1):
         """Return details of specified class as json object
 
         Argument:
             id    id of requested class
         """
-        logging.debug("*** Class details of id:'" + id + "'")
-        cmdbuild_url = self.url + "/services/rest/v2/classes/" + id
+        logging.debug("*** Class details of id:'" + id1 + "'")
+        cmdbuild_url = self.url + "/services/rest/v2/classes/" + id1
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
         r = requests.get(cmdbuild_url,  headers=headers)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
-        logging.debug(pprint(r.json()))
+        logging.debug(r.json())
         return r.json()
 
 
@@ -287,21 +423,60 @@ class cmdbuild:
         logging.debug(r.json())
         return r.json()
 
-    def class_get_all_cards_of_type(self, type):
+    def class_get_all_cards_of_type(self, typ):
         """Return all cards of specified class as json object
 
         Argument:
-            id    id of requested class
+            type    type of requested class
         """
-        logging.debug("*** Class  of type '" + type + "' cards")
-        cmdbuild_url = self.url + "/services/rest/v2/classes/" + type + "/cards"
+        logging.debug("*** Class  of type '" + typ + "' cards")
+        cmdbuild_url = self.url + "/services/rest/v2/classes/" + typ + "/cards"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
         r = requests.get(cmdbuild_url,  headers=headers)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
-        logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for class of type " + type + " cards ")
+        logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for class of type " + typ + " cards ")
         logging.debug(r.json())
         return r.json()
+
+    def class_get_all_cards_of_type_with_filter(self,typ,field,value):
+        """Return all cards of specified class and user filter field=value as json object
+
+        Argument:
+            type    type of requested class
+            field   field to filter on
+            value   value used in filter
+            
+        """
+        logging.debug("*** Class  of type '" + typ + "' cards where field '" + field + "' has value '" + str(value) + "'")
+        cmdbuild_url = self.url + "/services/rest/v2/classes/" + typ + "/cards?filter={\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"equal\",\"value\":[\"" + str(value) + "\"]}}}"
+        headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
+        r = requests.get(cmdbuild_url,  headers=headers)
+        if not r.status_code // 100 == 2:
+            return "Error: Unexpected response {}".format(r)
+        logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for class of type " + typ + " cards ")
+        logging.debug(r.json())
+        return r.json()
+
+    def class_get_all_cards_of_type_with_filter_like(self,typ,field,value):
+        """Return all cards of specified class and user filter field like value as json object
+
+        Argument:
+            type    type of requested class
+            field   field to filter on
+            value   value used in filter
+
+        """
+        logging.debug("*** Class  of type '" + typ + "' cards where field '" + field + "' has value '" + str(value) + "'")
+        cmdbuild_url = self.url + "/services/rest/v2/classes/" + typ + "/cards?filter={\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"like\",\"value\":[\"" + str(value) + "\"]}}}"
+        headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
+        r = requests.get(cmdbuild_url,  headers=headers)
+        if not r.status_code // 100 == 2:
+            return "Error: Unexpected response {}".format(r)
+        logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for class of type " + typ + " cards ")
+        logging.debug(r.json())
+        return r.json()
+
 
 
     def class_get_card_details(self, type, id1):
@@ -332,7 +507,7 @@ class cmdbuild:
             error message when second argument is not a valid JSON object
         """
         if (self.check_valid_json(cardobject)):
-            logging.debug("Inserting card of type " +str(cardtype) + " and with object:" + str(pprint(json.dumps(cardobject))) )
+            logging.debug("Inserting card of type " + str(cardtype) + " and with object:" + str(pprint(json.dumps(cardobject))) )
             cmdbuild_url = self.url + "/services/rest/v2/classes/" + str(cardtype) + "/cards/"
             headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
             try:
@@ -349,13 +524,40 @@ class cmdbuild:
             return "Second argument is not a valid JSON object"
 
 
-    def get_id(self,id1):
-        """Retrieve info by id NOT IMPLEMENTED YET!
+    def get_by_type_and_id(self,typ,id1):
+        """Retrieve Card or Class by id
         Arguments
             classid    id of requested classtype
+            cardtype   type of card to request
             cardid     id of requested card
         """
-        return 1
+        logging.debug("*** get Card(s) by type = "+ str(typ) + " and id = " + str(id1))
+        cmdbuild_url = self.url + "/services/rest/v2/classes/" + str(typ) + "/cards/" + str(id1) + "/"
+        headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
+        r = requests.get(cmdbuild_url,  headers=headers)
+        if not r.status_code // 100 == 2:
+            return "Error: Unexpected response {}".format(r)
+        logging.debug(r.json())
+        return r.json()
+
+    def get_by_domaintype_and_id(self,typ,id1):
+        """Retrieve Card or Class by id
+        Arguments
+            classid    id of requested classtype
+            cardtype   type of card to request
+            cardid     id of requested card
+        """
+        logging.debug("*** get domain(s) by type = " + str(typ) + " and id = " + str(id1))
+        cmdbuild_url = self.url + "/services/rest/v2/domains/" + str(typ) + "/" + str(id1) + "/"
+        headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
+        r = requests.get(cmdbuild_url,  headers=headers)
+        if not r.status_code // 100 == 2:
+            return "Error: Unexpected response {}".format(r)
+        logging.debug(r.json())
+        return r.json()
+
+
+        #return 1
         # <resource path="{attachmentId}/">
         # <resource path="{attachmentId}/{file: [^/]+}">
         # <resource path="{cardId}/">
@@ -388,3 +590,5 @@ class cmdbuild:
         #     return "Error: Unexpected response {}".format(r)
         # logging.debug(r)
         # return r
+
+
