@@ -1,10 +1,7 @@
-# module for CMDBuild interfacing
-# Trying to follow https://www.python.org/dev/peps/pep-0008/
+# module for CMDBuild interfacing based on original work from J. Baten - Copyright 2015 Deltares
+# https://github.com/kwoot/cmdbuild-python-lib
 #
-# Changelog
-# 2015-09-23 J. Baten Initial version
-#
-#Copyright 2015 Deltares
+#Copyright 2016 Lorenzo Dalrio
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
 #you may not use this file except in compliance with the License.
@@ -19,8 +16,8 @@
 #limitations under the License.
 #
 _cmdbuild__version="$Id: 65823ba79d5f98cfc7332bad34f34d6c4c76c29e $"
-__author__ = 'Jeroen Baten'
-__copyright__   = "Copyright 2015, Deltares"
+__author__ = 'Lorenzo Dalrio'
+__copyright__   = "Copyright 2016, Lorenzo Dalrio"
 
 import requests
 import json
@@ -29,8 +26,7 @@ import logging
 import sys
 
 
-
-#logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 
 class cmdbuild:
@@ -53,7 +49,7 @@ class cmdbuild:
         """
         try:
             json_object = json.loads(myjson)
-        except ValueError, e:
+        except ValueError as e:
             return False
         return True
 
@@ -61,12 +57,15 @@ class cmdbuild:
         """Return version information."""
         return "CMDBuild python lib version:" + version
 
-    def connect(self, url, user, password):
+    def connect(self, url, user, password, client_cert=None, verify=True):
         """Method to authenticate to cmdbuild server
 
         Parameters: url: url of server.
                     user: username to authenticate as.
                     password: password to use when authenticating.
+                    client_cert: client certificate to authenticate.
+                    verify: enable, disable server certificate validation
+                            or pass a certificate file to use for validation.
 
         Returns: 0 if succesfull or 1 for failure.
         """
@@ -81,21 +80,23 @@ class cmdbuild:
 
         logging.debug("*** Login and get authentication token ")
 
-        cmdbuild_url = url + "/services/rest/v2/sessions/"
+        cmdbuild_url = url + "/services/rest/v1/sessions/"
         data = {'username': user, 'password': password}
         headers = {'Content-type': 'application/json', 'Accept': '*/*'}
-        r = requests.post(cmdbuild_url, data=json.dumps(data), headers=headers)
-        #logging.debug((r.json()))
+        r = requests.post(cmdbuild_url, data=json.dumps(data), headers=headers, cert=client_cert, verify=verify)
+        logging.debug((r.json()))
         r1 = r.json()
         sessionid = r1["data"]["_id"]
-        #logging.debug("sessionid=" + str(pprint(sessionid)))
-        #logging.info(" Authentication token : " + sessionid)
+        logging.debug("sessionid=" + str(pprint(sessionid)))
+        logging.info(" Authentication token : " + sessionid)
 
         if (len(str(sessionid)) > 1):
             self.url = url
             self.user = user
             self.password = password
             self.sessionid = sessionid
+            self.client_cert = client_cert
+            self.verify = verify
             return 0
         #else:
         #    return 1
@@ -104,9 +105,9 @@ class cmdbuild:
     def session_info(self):
         """Return information about the current session in json format"""
         logging.debug("*** Session info")
-        cmdbuild_url = self.url + "/services/rest/v2/sessions/" + self.sessionid
+        cmdbuild_url = self.url + "/services/rest/v1/sessions/" + self.sessionid
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug(r.json())
@@ -118,9 +119,9 @@ class cmdbuild:
            Return: Lookup types found (in json format).
         """
         logging.debug("*** lookup_types")
-        cmdbuild_url = self.url + "/services/rest/v2/lookup_types"
+        cmdbuild_url = self.url + "/services/rest/v1/lookup_types"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url, headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug("There are " + str(r.json()["meta"]["total"]) + " results")
@@ -136,9 +137,9 @@ class cmdbuild:
         """
         logging.debug("\nTrying to find lookup values for : " + id)
         logging.debug("*** LookupType '" + id + "'")
-        cmdbuild_url = self.url + "/services/rest/v2/lookup_types/" + id + "/values"
+        cmdbuild_url = self.url + "/services/rest/v1/lookup_types/" + id + "/values"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for lookup_type " + id + "?")
@@ -155,9 +156,9 @@ class cmdbuild:
         """
         logging.debug("*** LookupTypeValue name'" + name + "'")
         logging.debug("*** LookupTypeValue id  '" + id + "'")
-        cmdbuild_url = self.url + "/services/rest/v2/lookup_types/" + name + "/values/" + id
+        cmdbuild_url = self.url + "/services/rest/v1/lookup_types/" + name + "/values/" + id
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug(r.json())
@@ -167,9 +168,9 @@ class cmdbuild:
     def domains_list(self):
         """Return list of domains defined"""
         logging.debug("*** domains")
-        cmdbuild_url = self.url + "/services/rest/v2/domains"
+        cmdbuild_url = self.url + "/services/rest/v1/domains"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.info("There are " + str(r.json()["meta"]["total"]) + " results")
@@ -184,9 +185,9 @@ class cmdbuild:
             id    id of requested domain
         """
         logging.debug("*** Domain relations of id:'" + id + "'")
-        cmdbuild_url = self.url + "/services/rest/v2/domains/" + id + "/relations/"
+        cmdbuild_url = self.url + "/services/rest/v1/domains/" + id + "/relations/"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug(r.json())
@@ -204,10 +205,10 @@ class cmdbuild:
         logging.debug("*** Domains of type " + id1 + " where field '" + field + "' has value '" + str(value) + "'")
         filter="{\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"equal\",\"value\":[\"" + str(value) + "\"]}}}"
         logging.debug("filter looks like: "+ filter)
-        cmdbuild_url = self.url + "/services/rest/v2/domains/" + id1 + "/relations?filter=" + filter
-        #cmdbuild_url = self.url + "/services/rest/v2/domains/" + id1 + "/relations/"
+        cmdbuild_url = self.url + "/services/rest/v1/domains/" + id1 + "/relations?filter=" + filter
+        #cmdbuild_url = self.url + "/services/rest/v1/domains/" + id1 + "/relations/"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug(r.json())
@@ -222,9 +223,9 @@ class cmdbuild:
             id      id of requested domain relation
         """
         logging.debug("*** Domain relation details of name " + name +  " and id " + str(id1)  )
-        cmdbuild_url = self.url + "/services/rest/v2/domains/" + name + "/relations/" + str(id1)
+        cmdbuild_url = self.url + "/services/rest/v1/domains/" + name + "/relations/" + str(id1)
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug(r.json())
@@ -238,9 +239,9 @@ class cmdbuild:
             name:  id of domain
         """
         logging.debug("*** Domain '" + id + "' details")
-        cmdbuild_url = self.url + "/services/rest/v2/domains/" + id
+        cmdbuild_url = self.url + "/services/rest/v1/domains/" + id
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug(r.json())
@@ -254,9 +255,9 @@ class cmdbuild:
             name:  id of domain
         """
         logging.debug("*** Domain '" + id + "' attributes")
-        cmdbuild_url = self.url + "/services/rest/v2/domains/" + id + "/attributes"
+        cmdbuild_url = self.url + "/services/rest/v1/domains/" + id + "/attributes"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug(r.json())
@@ -273,9 +274,9 @@ class cmdbuild:
         """
         logging.debug("*** Domains where field '" + field + "' has value '" + str(value) + "'")
         filter="{\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"equal\",\"value\":[\"" + str(value) + "\"]}}}"
-        cmdbuild_url = self.url + "/services/rest/v2/domains?filter=" + filter
+        cmdbuild_url = self.url + "/services/rest/v1/domains?filter=" + filter
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for this domain ")
@@ -332,7 +333,7 @@ class cmdbuild:
         # filter = filter +"{" +"\"simple\":{\"attribute\":\"" + field2 + "\",\"operator\":\"contain\",\"value\":[\"" + str(value2) + "\"]}}"
         # filter = filter + "] } }"
         # logging.debug("filter looks like: "+filter)
-        # cmdbuild_url = self.url + "/services/rest/v2/domains?filter="+filter
+        # cmdbuild_url = self.url + "/services/rest/v1/domains?filter="+filter
         # headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
         # r = requests.get(cmdbuild_url,  headers=headers)
         # if not r.status_code // 100 == 2:
@@ -351,14 +352,14 @@ class cmdbuild:
         """
 
         # werkende code in bash:
-        #cmdbuild_url = "http://tl-218.xtr.deltares.nl:8080/cmdbuild/services/rest/v2/domains/" + id + "/relations"
+        #cmdbuild_url = "http://tl-218.xtr.deltares.nl:8080/cmdbuild/services/rest/v1/domains/" + id + "/relations"
         #headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': sessionid }
         # = requests.get(cmdbuild_url, data=json.dumps(data), headers=headers)
 
         logging.debug("*** Domains '" + domain + "' where relation '" + field + "' has value '" + str(value) + "'")
-        cmdbuild_url = self.url + "/services/rest/v2/domains/" + domain + "/relations?filter={\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"equal\",\"value\":[\"" + str(value) + "\"]}}}"
+        cmdbuild_url = self.url + "/services/rest/v1/domains/" + domain + "/relations?filter={\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"equal\",\"value\":[\"" + str(value) + "\"]}}}"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         #logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for this domain ")
@@ -370,9 +371,10 @@ class cmdbuild:
     def classes_list(self):
         """Return list of available classes"""
         logging.debug("*** Classes ")
-        cmdbuild_url = self.url + "/services/rest/v2/classes"
+        cmdbuild_url = self.url + "/services/rest/v1/classes"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        logging.debug("headers: " + str(headers))
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug("There are " + str(r.json()["meta"]["total"]) + " results")
@@ -382,9 +384,9 @@ class cmdbuild:
     def classes_total(self):
         """Return list of available classes"""
         logging.debug("*** Classes ")
-        cmdbuild_url = self.url + "/services/rest/v2/classes"
+        cmdbuild_url = self.url + "/services/rest/v1/classes"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug("There are " + str(r.json()["meta"]["total"]) + " results")
@@ -398,14 +400,13 @@ class cmdbuild:
             id    id of requested class
         """
         logging.debug("*** Class details of id:'" + id1 + "'")
-        cmdbuild_url = self.url + "/services/rest/v2/classes/" + id1
+        cmdbuild_url = self.url + "/services/rest/v1/classes/" + id1
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug(r.json())
         return r.json()
-
 
     def class_get_attributes_of_type(self, id):
         """Return attributes of specified class as json object
@@ -414,9 +415,9 @@ class cmdbuild:
             id    id of requested class
         """
         logging.debug("*** Class  '" + id + "' attributes")
-        cmdbuild_url = self.url + "/services/rest/v2/classes/" + id + "/attributes"
+        cmdbuild_url = self.url + "/services/rest/v1/classes/" + id + "/attributes"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for class " + id + " attributes ")
@@ -430,9 +431,9 @@ class cmdbuild:
             type    type of requested class
         """
         logging.debug("*** Class  of type '" + typ + "' cards")
-        cmdbuild_url = self.url + "/services/rest/v2/classes/" + typ + "/cards"
+        cmdbuild_url = self.url + "/services/rest/v1/classes/" + typ + "/cards"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for class of type " + typ + " cards ")
@@ -449,9 +450,9 @@ class cmdbuild:
             
         """
         logging.debug("*** Class  of type '" + typ + "' cards where field '" + field + "' has value '" + str(value) + "'")
-        cmdbuild_url = self.url + "/services/rest/v2/classes/" + typ + "/cards?filter={\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"equal\",\"value\":[\"" + str(value) + "\"]}}}"
+        cmdbuild_url = self.url + "/services/rest/v1/classes/" + typ + "/cards?filter={\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"equal\",\"value\":[\"" + str(value) + "\"]}}}"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for class of type " + typ + " cards ")
@@ -468,9 +469,9 @@ class cmdbuild:
 
         """
         logging.debug("*** Class  of type '" + typ + "' cards where field '" + field + "' has value '" + str(value) + "'")
-        cmdbuild_url = self.url + "/services/rest/v2/classes/" + typ + "/cards?filter={\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"like\",\"value\":[\"" + str(value) + "\"]}}}"
+        cmdbuild_url = self.url + "/services/rest/v1/classes/" + typ + "/cards?filter={\"attribute\":{\"simple\":{\"attribute\":\"" + field + "\",\"operator\":\"like\",\"value\":[\"" + str(value) + "\"]}}}"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug("There are " + str(r.json()["meta"]["total"]) + " results for class of type " + typ + " cards ")
@@ -487,9 +488,9 @@ class cmdbuild:
             id      id of requested card
         """
         logging.debug("*** Class  '" + type + "' card details " + str(id1))
-        cmdbuild_url = self.url + "/services/rest/v2/classes/" + str(type) + "/cards/" + str(id1)
+        cmdbuild_url = self.url + "/services/rest/v1/classes/" + str(type) + "/cards/" + str(id1)
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug(r.json())
@@ -508,10 +509,10 @@ class cmdbuild:
         """
         if (self.check_valid_json(cardobject)):
             logging.debug("Inserting card of type " + str(cardtype) + " and with object:" + str(pprint(json.dumps(cardobject))) )
-            cmdbuild_url = self.url + "/services/rest/v2/classes/" + str(cardtype) + "/cards/"
+            cmdbuild_url = self.url + "/services/rest/v1/classes/" + str(cardtype) + "/cards/"
             headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
             try:
-                r = requests.post(cmdbuild_url,  data=cardobject, headers=headers)
+                r = requests.post(cmdbuild_url,  data=cardobject, headers=headers, cert=self.client_cert, verify=self.verify)
                 if not r.status_code // 100 == 2:
                     return "Error: Unexpected response {}".format(r)
                 logging.debug(r.json())
@@ -532,9 +533,9 @@ class cmdbuild:
             cardid     id of requested card
         """
         logging.debug("*** get Card(s) by type = "+ str(typ) + " and id = " + str(id1))
-        cmdbuild_url = self.url + "/services/rest/v2/classes/" + str(typ) + "/cards/" + str(id1) + "/"
+        cmdbuild_url = self.url + "/services/rest/v1/classes/" + str(typ) + "/cards/" + str(id1) + "/"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug(r.json())
@@ -548,9 +549,9 @@ class cmdbuild:
             cardid     id of requested card
         """
         logging.debug("*** get domain(s) by type = " + str(typ) + " and id = " + str(id1))
-        cmdbuild_url = self.url + "/services/rest/v2/domains/" + str(typ) + "/" + str(id1) + "/"
+        cmdbuild_url = self.url + "/services/rest/v1/domains/" + str(typ) + "/" + str(id1) + "/"
         headers = {'Content-type': 'application/json', 'Accept': '*/*', 'CMDBuild-Authorization': self.sessionid}
-        r = requests.get(cmdbuild_url,  headers=headers)
+        r = requests.get(cmdbuild_url,  headers=headers, cert=self.client_cert, verify=self.verify)
         if not r.status_code // 100 == 2:
             return "Error: Unexpected response {}".format(r)
         logging.debug(r.json())
